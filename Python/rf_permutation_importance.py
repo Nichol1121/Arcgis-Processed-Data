@@ -4,8 +4,9 @@ out-of-bag error and test AUC, and the alternative settings in Section III-C.
 Input: a CSV with one row per sample point: LABEL (1 = flood, 0 = non-flood),
 SET ('train' or 'test') and the eight factor scores (1-9). A table exported from ArcGIS Pro also
 works: it may use ';' between fields, SET_ for SET and Slope_1 for SLOPE.
-Run:   python rf_permutation_importance.py sintang_points_scores.csv
-The rows are in the order the model used them (training rows first), so the numbers match the paper.
+Run:   python rf_permutation_importance.py all_points.csv
+all_points.csv holds the factor scores that ArcGIS Pro extracted at the sample points, the same values
+the ArcGIS forest was trained on. Like ArcGIS Pro, the script skips points with a NoData factor value.
 Works in the ArcGIS Pro Python environment (it includes scikit-learn) or any Python with
 numpy, pandas and scikit-learn. The forest draws its bootstrap samples by row, so the row order
 and the scikit-learn version change the numbers slightly; the ranking of the factors stays the same.
@@ -21,7 +22,7 @@ FACTORS = ["FA", "DEM", "DD", "DIST", "LULC", "RAIN", "SLOPE", "SOIL"]
 # other names the same field may have in a table exported from ArcGIS Pro
 ALIASES = {"SET": ["SET_"], "SLOPE": ["Slope_1"], "LABEL": []}
 
-path = sys.argv[1] if len(sys.argv) > 1 else "sintang_points_scores.csv"
+path = sys.argv[1] if len(sys.argv) > 1 else "all_points.csv"
 first = open(path, encoding="utf-8-sig").readline()
 sep = max([",", ";", "\t"], key=first.count)
 df = pd.read_csv(path, sep=sep, encoding="utf-8-sig", decimal="," if sep == ";" else ".")
@@ -44,7 +45,7 @@ df["SET"] = df["SET"].astype(str).str.strip().str.lower()
 train, test = df[df.SET == "train"], df[df.SET == "test"]
 if len(train) == 0 or len(test) == 0:
     sys.exit(f"{path} has {len(train)} training and {len(test)} testing points; it needs both. "
-             "Use sintang_points_scores.csv, or a table of all sample points.")
+             "Use all_points.csv, or another table of all sample points.")
 
 # 1. Train the forest with the same settings as the ArcGIS forest
 rf = RandomForestClassifier(n_estimators=100, max_features="sqrt", min_samples_leaf=1,
