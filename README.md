@@ -22,7 +22,7 @@ The maps, the ROC curves (ArcSDM) and the block cross-validation were made in Ar
 | Script | Input | What it gives | Where in the paper |
 |---|---|---|---|
 | `delong_test.py` | `testing_values.csv` | AUC and 95% CI of both maps on the 85 testing points, and the paired DeLong test | Abstract; Sections III-E and IV-C; Fig. 6 |
-| `ahp_auc_all_points.py` | `all_points.csv` | AHP AUC on all sample points and on the block cross-validation points | Section IV-C; Fig. 7 |
+| `ahp_auc_all_points.py` | `all_points.csv` | Which points make up the 277 block cross-validation points, and the AHP AUC on them and on all sample points | Section IV-C; Fig. 7 |
 | `rf_permutation_importance.py` | `sintang_points_scores.csv` | Permutation importance, and the test AUC with other forest settings | Table IV; Sections III-C and IV-B |
 | `near15_test.py` | `near15_points_scores.csv` | AUCs with non-flood points placed only within 15 km of a reported flood | Section IV-C |
 
@@ -71,9 +71,21 @@ python ahp_auc_all_points.py all_points.csv
 Expected output:
 
 ```
+Sample points in the file: 284
+Left out of the block cross-validation (7), with the layers that have no value:
+  F121    flood      LULC
+  F113    flood      LULC
+  F18     flood      AHP map, LULC
+  NF002   non-flood  LULC
+  NF041   non-flood  AHP map, DEM, LULC, Slope_1
+  NF065   non-flood  LULC
+  NF105   non-flood  AHP map
 All sample points: 281 points (141 flood, 140 non-flood), AHP AUC = 0.822
 Block cross-validation points: 277 points (139 flood, 138 non-flood), AHP AUC = 0.828
+Block cross-validation points per fold: 1: 34, 2: 93, 3: 50, 4: 55, 5: 45
 ```
+
+See [Block cross-validation and the 277 points](#block-cross-validation-and-the-277-points) for what these numbers mean.
 
 **Permutation importance**
 
@@ -121,6 +133,36 @@ AHP AUC           0.755
   1. **Extract Multi Values to Points** on the testing points (or on all sample points), with `results/FinalAhp.tif` saved as field `AHP_WS` and `results/RandomForest.tif` saved as field `RandomFore`, and **Bilinear interpolation** left off.
   2. **Export Table** to a `.csv` file in a normal folder (not inside a `.gdb`).
 - `sintang_points_scores.csv` and `near15_points_scores.csv` hold the factor scores (1–9) of each sample point, its label (`LABEL` 1 = flood, 0 = non-flood) and whether it is a training or a testing point (`SET`). Their rows are in the order the model used them, so the scripts give exactly the numbers above.
+
+### Block cross-validation and the 277 points
+
+A random 70/30 split puts many testing points close to training points, which can make the forest look more accurate than it is. The spatial block cross-validation (Section III-E) keeps points from the same 20 km block together.
+
+**How the 277 points are found**
+
+The sample has 284 points (142 flood, 142 non-flood). Seven are left out because a layer has no value (NoData) there:
+
+| Point | Layers with no value |
+|---|---|
+| F18 | AHP map, LULC |
+| NF041 | AHP map, elevation, LULC, slope |
+| NF105 | AHP map |
+| F113, F121, NF002, NF065 | LULC |
+
+Six of the seven have no LULC value, because permanent water is NoData in the LULC layer. The forest cannot be trained on, or predict, a point without all eight factor values (ArcGIS Pro skips such records). The AHP cannot be scored without a value in the AHP map. The comparison therefore uses the 277 points that have both: 139 flood and 138 non-flood. The AHP's AUC on all sample points (0.822) uses the 281 points that have an AHP value.
+
+`ahp_auc_all_points.py` lists the seven points and counts the rest.
+
+**How the 277 points are used (ArcGIS Pro)**
+
+1. **Generate Tessellation**: square cells of 400 km² (20 km × 20 km) over the district. Each cell gets a `GRID_ID`, for example `E-7`.
+2. **Spatial Join**: join the grid to the sample points, so each point gets the `GRID_ID` of its cell.
+3. Give each grid cell a fold number from 1 to 5 at random, in a field `FOLD` (**Add Field**, then **Calculate Field**). All points in the same cell share a fold, so a block never has points on both the training and the testing side. `all_points.csv` holds the `GRID_ID` and `FOLD` of every point.
+4. Run **Forest-based and Boosted Classification and Regression** five times with the same settings as the main forest (Section III-C). In run *k*, train on the points with `FOLD <> k` and predict to the points with `FOLD = k` (Prediction Type: **Predict to features**).
+5. **Merge** the five prediction outputs. Each point now has a flood probability from a forest that was not trained on any point in its block. The AUC of these probabilities on the 277 points is the forest's block cross-validation AUC: 0.891.
+6. Score the AHP on the same 277 points with `ahp_auc_all_points.py`: 0.828. The AHP is not trained on any points, so the folds do not change its result.
+
+The folds differ in size (34 to 93 points) because the points are not spread evenly. Fold 2 is the largest because it holds cell `E-7` around Sintang City.
 
 ### Notes
 
