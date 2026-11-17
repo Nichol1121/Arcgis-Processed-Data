@@ -24,7 +24,6 @@ The maps, the ROC curves (ArcSDM) and the block cross-validation were made in Ar
 | `delong_test.py` | `testing_values.csv` | AUC and 95% CI of both maps on the 85 testing points, and the paired DeLong test | Abstract; Sections III-E and IV-C; Fig. 6 |
 | `ahp_auc_all_points.py` | `all_points.csv` | Which sample points make up the 277 points, and the AHP AUC on them | Section IV-C; Fig. 7 |
 | `rf_permutation_importance.py` | `all_points.csv` | Permutation importance, and the test AUC with other forest settings | Table IV; Sections III-C and IV-B |
-| `near15_test.py` | `near15_points_scores.csv` | AUCs with non-flood points placed only within 15 km of a reported flood | Section IV-C |
 
 ### What you need
 
@@ -118,27 +117,12 @@ Test AUC with other settings:
 
 The script uses the factor scores that ArcGIS Pro extracted at the sample points, the same values the ArcGIS forest was trained on. Like ArcGIS Pro, it skips the 6 points that have a NoData factor value (see [the 277 points](#block-cross-validation-and-the-277-points)), so it trains on 195 points and tests on 83. The "Share (%)" column is the "RF permutation" column of Table IV. The out-of-bag error printed here belongs to the Python forest. The paper reports the out-of-bag error of the ArcGIS Pro forest (18%), taken from the tool's messages.
 
-**Test with non-flood points within 15 km of a reported flood**
-
-```
-python near15_test.py near15_points_scores.csv
-```
-
-Expected output:
-
-```
-Training points 198, testing points 86
-Random forest AUC 0.804
-AHP AUC           0.755
-```
-
 ### Input files
 
 - `testing_values.csv` and `all_points.csv` come straight from ArcGIS Pro:
   1. **Extract Multi Values to Points** on the testing points (or on all 284 sample points), with `results/FinalAhp.tif` saved as field `AHP_WS` and `results/RandomForest.tif` saved as field `RandomFore`, and **Bilinear interpolation** left off.
   2. **Export Table** to a `.csv` file in a normal folder (not inside a `.gdb`).
 - `all_points.csv` also holds, for each of the 284 sample points, the eight factor scores (1–9) extracted from the factor rasters, its label (`LABEL` 1 = flood, 0 = non-flood), whether it is a training or a testing point (`SET_`), and its `GRID_ID` and `FOLD`.
-- `near15_points_scores.csv` holds a second sample whose non-flood points all lie within 15 km of a reported flood, with the same fields (`SET` instead of `SET_`). Its rows are in the order the model used them, so the script gives exactly the numbers above.
 
 ### Block cross-validation and the 277 points
 
